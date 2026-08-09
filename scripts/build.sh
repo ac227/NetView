@@ -13,6 +13,7 @@ echo "==> 1/3 构建前端"
 echo "==> 2/3 复制前端产物到后端（嵌入二进制）"
 rm -rf "$WEB_DIST"
 cp -r "$ROOT/frontend/dist" "$WEB_DIST"
+touch "$WEB_DIST/.gitkeep"
 
 echo "==> 3/3 编译二进制（版本 ${VERSION}）"
 mkdir -p "$BIN_DIR"
