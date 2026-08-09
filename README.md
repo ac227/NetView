@@ -84,7 +84,7 @@ macOS 首次运行如提示"无法验证开发者"，在「系统设置 → 隐�
 |---|---|---|
 | `NETVIEW_PORT` | `8080` | 端口 |
 | `NETVIEW_HOST` | `0.0.0.0` | 监听地址（局域网共享保持默认） |
-| `NETVIEW_DB_DSN` | `postgres://netview:netview_dev@localhost:5432/netview` | 数据库连接串 |
+| `NETVIEW_DB_DSN` | `postgres://<用户>:<密码>@localhost:5432/netview` | 数据库连接串（默认值为本地开发用，请勿在生产沿用） |
 | `NETVIEW_DATA_DIR` | `<二进制目录>/data` | 媒体文件存储目录（默认跟随可执行文件位置） |
 | `NETVIEW_JWT_SECRET` | 开发用固定值 | 生产环境务必修改 |
 | `NETVIEW_YTDLP_PATH` | `yt-dlp` | yt-dlp 可执行文件路径 |
