@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 BACKUP_DIR="${1:?用法: ./scripts/restore.sh <备份目录>}"
 DB_DSN="${NETVIEW_DB_DSN:-postgres://netview:netview_dev@localhost:5432/netview}"
-DATA_DIR="${NETVIEW_DATA_DIR:-$ROOT/data}"
+DATA_DIR="${NETVIEW_DATA_DIR:-$ROOT/bin/data}"
 
 [ -f "$BACKUP_DIR/database.dump" ] || { echo "缺少 database.dump"; exit 1; }
 [ -f "$BACKUP_DIR/media.tar.gz" ] || { echo "缺少 media.tar.gz"; exit 1; }

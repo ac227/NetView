@@ -14,7 +14,7 @@ echo "==> 2/3 复制前端产物到后端（嵌入二进制）"
 rm -rf "$WEB_DIST"
 cp -r "$ROOT/frontend/dist" "$WEB_DIST"
 
-echo "==> 3/3 编译二进制（版本 $VERSION）"
+echo "==> 3/3 编译二进制（版本 ${VERSION}）"
 mkdir -p "$BIN_DIR"
 (cd "$ROOT/backend" && CGO_ENABLED=0 go build -trimpath \
   -ldflags="-s -w -X main.version=$VERSION" \
