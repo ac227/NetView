@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  title: NetView API
+  version: 0.1.0
+  description: |
+    网络媒体收藏管理系统 API。
+    认证方式：POST /api/auth/login 获取 JWT，之后所有业务请求携带
+    `Authorization: Bearer <token>`。
+servers:
+  - url: http://localhost:8080/api
+tags:
+  - name: auth
+    description: 认证
+  - name: items
+    description: 媒体条目
+  - name: tags
+    description: 标签
+  - name: categories
+    description: 分类
+  - name: download
+    description: 视频下载任务
+  - name: settings
+    description: 系统设置
+paths:
+  /auth/status:
+    get:
+      tags: [auth]
+      summary: 检查是否已设置密码
+      responses:
+        '200':
+          description: configured=false 表示首次使用需设置密码
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  needs_setup: { type: boolean }
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 登录（首次调用时设置共享密码）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200':
+          description: 登录成功，返回 JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /items:
+    get:
+      tags: [items]
+      summary: 列表/搜索/筛选
+      security: [bearerAuth: []]
+      parameters:
+        - { name: keyword, in: query, schema: { type: string }, description: 关键词（标题/描述模糊匹配） }
+        - { name: type, in: query, schema: { type: string, enum: [image, video] } }
+        - { name: status, in: query, schema: { type: string, enum: [ready, downloading, downloaded, failed] } }
+        - { name: favorite, in: query, schema: { type: boolean } }
+        - { name: tag, in: query, schema: { type: string }, description: 按标签名筛选 }
+        - { name: category, in: query, schema: { type: integer }, description: 按分类 ID 筛选 }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, name, size] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Item' } }
+                  total: { type: integer }
+    post:
+      tags: [items]
+      summary: 创建条目（仅保存链接/元数据，不下载）
+      security: [bearerAuth: []]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemInput'
+      responses:
+        '201': { $ref: '#/components/responses/ItemCreated' }
+  /items/upload:
+    post:
+      tags: [items]
+      summary: 上传文件（multipart/form-data）
+      security: [bearerAuth: []]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                type: { type: string, enum: [image, video] }
+                title: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/ItemCreated' }
+  /items/fetch-meta:
+    post:
+      tags: [items]
+      summary: 抓取 URL 的页面元数据（OG 标签：标题/描述/封面）
+      security: [bearerAuth: []]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+        '502':
+          description: 抓取失败
+  /items/{id}:
+    get:
+      tags: [items]
+      summary: 条目详情
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [items]
+      summary: 更新元数据（标题/描述/链接/标签/分类）
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemInput' }
+      responses:
+        '200': { $ref: '#/components/responses/ItemCreated' }
+    delete:
+      tags: [items]
+      summary: 删除条目（含本地文件）
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { deleted: { type: boolean } }
+  /items/{id}/file:
+    get:
+      tags: [items]
+      summary: 获取媒体文件流（支持 HTTP Range，供播放器拖动进度）
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '200': { description: 媒体内容 }
+        '206': { description: 部分内容（Range 请求） }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /items/{id}/thumbnail:
+    get:
+      tags: [items]
+      summary: 获取缩略图
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '200': { description: JPEG 图片 }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /items/{id}/favorite:
+    post:
+      tags: [items]
+      summary: 收藏/取消收藏
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                favorite: { type: boolean, default: true }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { favorite: { type: boolean } }
+  /items/{id}/download:
+    post:
+      tags: [download]
+      summary: 触发下载（直链直接下载，其他走 yt-dlp）
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '202':
+          description: 已接受，返回下载任务 ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { job_id: { type: integer } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /items/{id}/ai-tag:
+    post:
+      tags: [items]
+      summary: AI 自动打标签（需先在设置中配置 OpenAI 兼容 API）
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title: { type: string }
+                  description: { type: string }
+                  tags: { type: array, items: { type: string } }
+        '400': { description: AI 未配置 }
+  /tags:
+    get:
+      tags: [tags]
+      summary: 全部标签
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags: { type: array, items: { type: string } }
+  /categories:
+    get:
+      tags: [categories]
+      summary: 全部分类（含条目计数）
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+    post:
+      tags: [categories]
+      summary: 新建分类
+      security: [bearerAuth: []]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                parent_id: { type: integer, nullable: true }
+                sort: { type: integer }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { id: { type: integer } }
+  /categories/{id}:
+    put:
+      tags: [categories]
+      summary: 更新分类
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                parent_id: { type: integer, nullable: true }
+                sort: { type: integer }
+      responses: { '200': { description: OK } }
+    delete:
+      tags: [categories]
+      summary: 删除分类
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses: { '200': { description: OK } }
+  /download/jobs:
+    get:
+      tags: [download]
+      summary: 下载任务列表
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items: { $ref: '#/components/schemas/Job' }
+  /download/jobs/{id}/cancel:
+    post:
+      tags: [download]
+      summary: 取消下载任务
+      security: [bearerAuth: []]
+      parameters: [ { $ref: '#/components/parameters/ItemId' } ]
+      responses: { '200': { description: OK } }
+  /settings:
+    get:
+      tags: [settings]
+      summary: 读取配置（API Key 脱敏显示）
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Settings' }
+    put:
+      tags: [settings]
+      summary: 更新配置（AI API / 修改密码）
+      security: [bearerAuth: []]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ai:
+                  type: object
+                  properties:
+                    base_url: { type: string }
+                    api_key: { type: string }
+                    model: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { ok: { type: boolean } }
+  /system/stats:
+    get:
+      tags: [settings]
+      summary: 系统统计
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: integer }
+                  images: { type: integer }
+                  videos: { type: integer }
+                  favorites: { type: integer }
+                  pending_jobs: { type: integer }
+                  disk_bytes: { type: integer }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ItemId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    BadRequest:
+      description: 参数错误
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: { error: { type: string } }
+    Unauthorized:
+      description: 未认证
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: { error: { type: string } }
+    NotFound:
+      description: 不存在
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: { error: { type: string } }
+    ItemCreated:
+      description: 条目已创建/更新
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Item' }
+  schemas:
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        expires: { type: string, format: date-time }
+        user: { type: string }
+        setup: { type: boolean, description: 是否为首次设置密码 }
+    Item:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [image, video] }
+        title: { type: string }
+        description: { type: string }
+        source_url: { type: string }
+        local_path: { type: string }
+        thumbnail_path: { type: string }
+        mime_type: { type: string }
+        size: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        duration: { type: integer }
+        status: { type: string, enum: [ready, downloading, downloaded, failed] }
+        favorite: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        tags: { type: array, items: { type: string } }
+        categories: { type: array, items: { type: integer } }
+    ItemInput:
+      type: object
+      properties:
+        type: { type: string, enum: [image, video] }
+        title: { type: string }
+        description: { type: string }
+        source_url: { type: string }
+        tags: { type: array, items: { type: string } }
+        categories: { type: array, items: { type: integer } }
+    Meta:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        image: { type: string }
+        video: { type: string }
+        content_type: { type: string }
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        parent_id: { type: integer, nullable: true }
+        sort: { type: integer }
+        count: { type: integer }
+    Job:
+      type: object
+      properties:
+        id: { type: integer }
+        item_id: { type: integer }
+        url: { type: string }
+        adapter: { type: string, enum: [direct, yt-dlp] }
+        status: { type: string, enum: [pending, running, done, failed, cancelled] }
+        progress: { type: number }
+        info: { type: string }
+        error: { type: string }
+    Settings:
+      type: object
+      properties:
+        ai:
+          type: object
+          properties:
+            base_url: { type: string }
+            api_key: { type: string, description: 脱敏显示 }
+            model: { type: string }
+            configured: { type: boolean }
+        has_password: { type: boolean }

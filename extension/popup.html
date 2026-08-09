@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NetView 收藏助手</title>
+    <style>
+      body { width: 340px; margin: 0; font: 13px/1.5 -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      header { padding: 10px 14px; background: #1677ff; color: #fff; font-weight: 600; }
+      .body { padding: 12px 14px; }
+      .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; gap: 8px; }
+      .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #f0f0f0; flex: 0 0 48px; }
+      .info { flex: 1; min-width: 0; }
+      .alt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+      .dim { color: #999; font-size: 11px; }
+      .btn { background: #1677ff; color: #fff; border: 0; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+      .btn:hover { opacity: 0.85; }
+      .btn.gray { background: #f0f0f0; color: #333; }
+      .tip { color: #999; font-size: 12px; }
+      .err { color: #ff4d4f; font-size: 12px; margin-top: 8px; }
+      .empty { color: #999; padding: 20px 0; text-align: center; }
+      .meta { color: #666; font-size: 12px; margin: 6px 0; }
+      input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d9d9d9; border-radius: 4px; margin: 4px 0; }
+      .mt8 { margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <header>NetView 收藏助手</header>
+    <div class="body" id="app">
+      <div id="loading" class="empty">加载中…</div>
+    </div>
+  </body>
+  <script src="popup.js"></script>
+</html>

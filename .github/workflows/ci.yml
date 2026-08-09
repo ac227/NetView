@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: netview
+          POSTGRES_PASSWORD: netview_dev
+          POSTGRES_DB: netview
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netview"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NETVIEW_DB_DSN: postgres://netview:netview_dev@localhost:5432/netview
+      NETVIEW_DATA_DIR: /tmp/netview-data
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend build & vet
+        run: |
+          cd backend
+          go build ./...
+          go vet ./...
+
+      - name: Frontend build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: 冒烟测试（启动服务器 + 迁移 + API）
+        run: |
+          # 内嵌前端需要 dist，先复制过去
+          mkdir -p backend/internal/web/dist
+          cp -r frontend/dist/* backend/internal/web/dist/
+          cd backend
+          go build -o /tmp/netview ./cmd/server
+          /tmp/netview > /tmp/netview.log 2>&1 &
+          SRV=$!
+          sleep 3
+          # 首次未设置密码
+          STATUS=$(curl -s http://localhost:8080/api/auth/status)
+          echo "auth status: $STATUS"
+          echo "$STATUS" | grep -q 'needs_setup":true'
+          # 登录（首次调用即设置密码）
+          TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"password":"ci-test-password"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+          [ -n "$TOKEN" ]
+          # 列表应返回空数组
+          curl -s "http://localhost:8080/api/items" -H "Authorization: Bearer $TOKEN" | grep -q '"items":\[\]'
+          # 无 token 应 401
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/items)" = "401" ]
+          kill $SRV
+          echo "冒烟测试全部通过"

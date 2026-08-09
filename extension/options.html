@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NetView 收藏助手 - 设置</title>
+    <style>
+      body { max-width: 460px; margin: 40px auto; font: 14px/1.6 -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #333; }
+      h1 { font-size: 18px; }
+      label { display: block; margin-top: 14px; color: #555; }
+      input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; margin-top: 4px; }
+      button { margin-top: 18px; padding: 8px 20px; background: #1677ff; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-size: 14px; }
+      button.secondary { background: #f0f0f0; color: #333; margin-left: 8px; }
+      .status { margin-top: 12px; font-size: 13px; }
+      .ok { color: #52c41a; }
+      .err { color: #ff4d4f; }
+      .tip { color: #999; font-size: 12px; margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>NetView 收藏助手设置</h1>
+    <label>服务器地址
+      <input id="serverUrl" type="text" placeholder="http://192.168.1.10:8080" />
+    </label>
+    <label>访问密码
+      <input id="password" type="password" placeholder="NetView 登录密码" />
+    </label>
+    <div>
+      <button id="save">保存</button>
+      <button id="test" class="secondary">测试连接</button>
+    </div>
+    <div id="status" class="status"></div>
+    <div class="tip">右键任意图片/视频/链接，即可一键保存到 NetView；点击工具栏图标可扫描当前页面逐张保存。</div>
+  </body>
+  <script src="options.js"></script>
+</html>
