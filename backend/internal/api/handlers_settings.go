@@ -37,7 +37,7 @@ func (s *Server) setSettings(values map[string]string) error {
 }
 
 const (
-	settingAITitle    = "ai.base_url"
+	settingAIBaseURL    = "ai.base_url"
 	settingAIAPIKey   = "ai.api_key"
 	settingAIModel    = "ai.model"
 )
@@ -55,7 +55,7 @@ func (s *Server) getSettings(c *gin.Context) {
 	}
 	respondJSON(c, http.StatusOK, gin.H{
 		"ai": gin.H{
-			"base_url": m[settingAITitle],
+			"base_url": m[settingAIBaseURL],
 			"api_key":  masked,
 			"model":    m[settingAIModel],
 			"configured": m[settingAIAPIKey] != "",
@@ -81,7 +81,7 @@ func (s *Server) updateSettings(c *gin.Context) {
 	values := map[string]string{}
 	if req.AI != nil {
 		if req.AI.BaseURL != "" {
-			values[settingAITitle] = req.AI.BaseURL
+			values[settingAIBaseURL] = req.AI.BaseURL
 		}
 		if req.AI.Model != "" {
 			values[settingAIModel] = req.AI.Model

@@ -5,14 +5,40 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/netview/netview/internal/ai"
 )
+
+// aiClient 从数据库设置读取 AI 配置（设置页保存的内容），
+// 未配置时回退到启动时的环境变量默认值。
+func (s *Server) aiClient() *ai.Client {
+	m, err := s.getSettingsMap()
+	if err != nil {
+		return s.ai
+	}
+	cfg := ai.Config{
+		BaseURL: firstNonEmpty(m[settingAIBaseURL], s.cfg.AI.BaseURL),
+		APIKey:  firstNonEmpty(m[settingAIAPIKey], s.cfg.AI.APIKey),
+		Model:   firstNonEmpty(m[settingAIModel], s.cfg.AI.Model),
+	}
+	return ai.NewClient(cfg)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
 
 func (s *Server) triggerAITag(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
 		return
 	}
-	if !s.ai.Enabled() {
+	client := s.aiClient()
+	if !client.Enabled() {
 		respondError(c, http.StatusBadRequest, "AI not configured: set base_url, api_key and model in settings")
 		return
 	}
@@ -26,9 +52,9 @@ func (s *Server) triggerAITag(c *gin.Context) {
 
 	var result *aiResult
 	if item.LocalPath != "" {
-		result, err = s.runAITag(ctx, item.LocalPath, "")
+		result, err = s.runAITag(ctx, client, s.store.AbsPath(item.LocalPath), "")
 	} else if item.SourceURL != "" {
-		result, err = s.runAITag(ctx, "", item.SourceURL)
+		result, err = s.runAITag(ctx, client, "", item.SourceURL)
 	} else {
 		respondError(c, http.StatusBadRequest, "item has no local file or source url")
 		return
@@ -48,15 +74,15 @@ func (s *Server) triggerAITag(c *gin.Context) {
 	respondJSON(c, http.StatusOK, gin.H{"title": result.Title, "description": result.Description, "tags": item.Tags})
 }
 
-func (s *Server) runAITag(ctx context.Context, localPath, url string) (*aiResult, error) {
+func (s *Server) runAITag(ctx context.Context, client *ai.Client, localPath, url string) (*aiResult, error) {
 	if localPath != "" {
-		r, e := s.ai.TagImage(ctx, localPath)
+		r, e := client.TagImage(ctx, localPath)
 		if e != nil {
 			return nil, e
 		}
 		return &aiResult{Title: r.Title, Description: r.Description, Tags: r.Tags}, nil
 	}
-	r, e := s.ai.TagURL(ctx, url)
+	r, e := client.TagURL(ctx, url)
 	if e != nil {
 		return nil, e
 	}
